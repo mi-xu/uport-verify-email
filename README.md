@@ -2,11 +2,11 @@
 
 ## Configuring the verifier
 ```js
-import uport from 'uport-js'
+import { Credentials, SimpleSigner } from 'uport'
 import EmailVerifier from 'uport-verify-email'
 
 // set up the uport app credentials
-const uPortApp = new uport.Credentials({...})
+const uPortApp = new Credentials({..., signer: new SimpleSigner(...)})
 
 // set up the email account for sending verification QRs
 // pass the uport app credentials

@@ -1,3 +1,21 @@
+const DEFAULT_CONFIRM_SUBJECT = 'uPort Email Confirmation'
+const DEFAULT_RECEIVE_SUBJECT = 'uPort Email Attestation'
+const DEFAULT_TEMPLATE = qr => `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Email Template</title>
+    </head>
+    <body>
+        <div>${qr}</div>
+    </body>
+    </html>
+`
+
+const throwIfMissing = x => {
+    throw new Error(`Missing parameter '${x}'`)
+}
+
 class EmailVerifier {
 
     /**
@@ -16,16 +34,28 @@ class EmailVerifier {
      * @param   {string}        settings.pass - sender email password
      * @param   {string}        settings.host - mail server host name
      * @param   {number}        settings.port - mail server port number
-     * @param   {boolean}       settings.secure - TLS flag
-     * @param   {string}        settings.confirmSubject - confirmation email subject
-     * @param   {string}        settings.receiveSubject - receive attestation email subject
-     * @param   {template}      settings.confirmTemplate - confirmation email template
-     * @param   {template}      settings.receiveTemplate - receive attestation email template
-     * @param   {Object}        settings.customRequestParams - custom params for credentials.createRequest()
+     * @param   {boolean}       [settings.secure=false] - TLS flag
+     * @param   {string}        [settings.confirmSubject] - confirmation email subject
+     * @param   {string}        [settings.receiveSubject] - receive attestation email subject
+     * @param   {template}      [settings.confirmTemplate] - confirmation email template
+     * @param   {template}      [settings.receiveTemplate] - receive attestation email template
+     * @param   {Object}        [settings.customRequestParams] - custom params for credentials.createRequest()
      * @param   {Credentials}   settings.credentials - uPort Credentials object
      */
-    constructor (settings) {
-        this.settings = settings
+    constructor ({
+        callbackUrl = throwIfMissing`callbackUrl`,
+        user = throwIfMissing`user`,
+        pass = throwIfMissing`pass`,
+        host = throwIfMissing`host`,
+        port = throwIfMissing`port`,
+        secure = false,
+        confirmSubject = DEFAULT_CONFIRM_SUBJECT,
+        receiveSubject = DEFAULT_RECEIVE_SUBJECT,
+        confirmTemplate = DEFAULT_TEMPLATE,
+        receiveTemplate = DEFAULT_TEMPLATE,
+        customRequestParams = {},
+        credentials = throwIfMissing`credentials`,
+    } = {}) {
     }
 
     /**

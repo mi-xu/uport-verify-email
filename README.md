@@ -11,10 +11,8 @@ const uPortApp = new Credentials({..., signer: new SimpleSigner(...)})
 // set up the email account for sending verification QRs
 // pass the uport app credentials
 const verifier = new EmailVerifier({
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
     port: 465,
     host: 'smtp.uport.me',
     secure: true, // use TLS

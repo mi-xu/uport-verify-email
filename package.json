@@ -2,9 +2,11 @@
   "name": "uport-verify-email",
   "version": "1.0.0",
   "description": "server side library for allowing users to verify email address and receive an attestation claiming common ownership with a uport identity",
-  "main": "index.js",
+  "main": "lib/index.js",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "build": "yarn build:es5 && yarn test",
+    "build:es5": "./node_modules/.bin/babel src -d lib"
   },
   "keywords": [
     "uPort",
@@ -17,7 +19,7 @@
   "author": "Mike Xu <mike.xu@consensys.net>",
   "license": "MIT",
   "devDependencies": {
-    "babel": "^6.23.0",
+    "babel-cli": "^6.26.0",
     "babel-jest": "^22.4.3",
     "babel-preset-env": "^1.6.1",
     "jest": "^22.4.3",

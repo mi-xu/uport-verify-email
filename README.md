@@ -22,6 +22,7 @@ const verifier = new EmailVerifier({
     confirmationTemplate: qr => `<html>...${qr}...</html>`,
     attestationSubject: 'uPort Email Attestation',
     attestationTemplate: qr => `<html>...${qr}...</html>`,
+    callbackUrl: 'https://api.uport.me/verify',
     customRequestParams: {},
     credentials: uPortApp,
 })
@@ -34,25 +35,16 @@ const email = params.email
 
 // send an email to user containing the request QR and return the token
 const requestToken = verifier.receiveEmail(email)
-
-// persist the email indexed by request token
-db.put(requestToken, email)
 ```
 
-## User scans QR in email and posts API callback
+## Handling callback after user scans QR from their email
 ```js
 // endpoint reads access token from POST data
 const accessToken = data.access_token
 
-// parse the original request token from the access token
-const req = verifier.getRequestToken(accessToken)
-
-// look up email for given request token
-const email = db.get(req)
-
 // sign an attestation claiming control of the email
-// push the attestation and send an email with QR to download
-const identity = verifier.verify(accessToken, email)
+// by default, push the attestation and send an email with QR to download
+const identity = verifier.verify(accessToken)
 
 // do something with the email and request identity attributes
 db.createUser(identity)

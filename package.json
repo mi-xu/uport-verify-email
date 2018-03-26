@@ -16,6 +16,10 @@
     "identity",
     "server"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mi-xu/uport-verify-email.git"
+  },
   "author": "Mike Xu <mike.xu@consensys.net>",
   "license": "MIT",
   "devDependencies": {

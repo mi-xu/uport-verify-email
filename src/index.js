@@ -56,17 +56,35 @@ class EmailVerifier {
         customRequestParams = {},
         credentials = throwIfMissing`credentials`,
     } = {}) {
+        this.callbackUrl = callbackUrl
+        this.user = user
+        this.pass = pass
+        this.host = host
+        this.secure = secure
+        this.confirmSubject = confirmSubject
+        this.receiveSubject = receiveSubject
+        this.confirmTemplate = confirmTemplate
+        this.receiveTemplate = receiveTemplate
+        this.customRequestParams = customRequestParams
+        this.credentials = credentials
     }
 
     /**
      * Generates a selective disclosure request and sends an email containing the request QR.
      * 
      * @param {string} email - email address to send selective disclosure QR to
-     * @param {string} [callbackUrl=settings.callbackUrl] - endpoint to call when user scans email verification QR
+     * @param {string} [callbackUrl=this.callbackUrl] - endpoint to call when user scans email verification QR
      * @return {string} selective disclosure request token
      */
-    receiveEmail (email, callbackUrl = this.settings.callbackUrl) {
-        return 'requestToken'
+    receiveEmail (email, callbackUrl = this.callbackUrl) {
+        // create selective disclosure JWT
+        return this.credentials.createRequest({
+            ...this.customRequestParams,
+            callbackUrl,
+            notifications: true,
+        })
+        // create QR from JWT
+        // send email
     }
 
     /**

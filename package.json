@@ -28,5 +28,14 @@
     "babel-preset-env": "^1.6.1",
     "jest": "^22.4.3",
     "regenerator-runtime": "^0.11.1"
+  },
+  "jest": {
+    "coverageReporters": [
+      "html",
+      "text"
+    ]
+  },
+  "dependencies": {
+    "isemail": "^3.1.1"
   }
 }

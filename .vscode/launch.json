@@ -9,7 +9,10 @@
             "request": "launch",
             "name": "Jest",
             "program": "${workspaceFolder}/node_modules/jest/bin/jest.js",
-            "args": [ "-i" ],
+            "args": [
+                "-i",
+                "--coverage"
+            ],
             "internalConsoleOptions": "openOnSessionStart",
             "outFiles": [ "$(workspaceRoot}/__test__" ]
         }

@@ -1,3 +1,5 @@
+import * as Isemail from 'isemail'
+
 const DEFAULT_CONFIRM_SUBJECT = 'uPort Email Confirmation'
 const DEFAULT_RECEIVE_SUBJECT = 'uPort Email Attestation'
 const DEFAULT_TEMPLATE = qr => `
@@ -76,7 +78,12 @@ class EmailVerifier {
      * @param {string} [callbackUrl=this.callbackUrl] - endpoint to call when user scans email verification QR
      * @return {string} selective disclosure request token
      */
-    receiveEmail (email, callbackUrl = this.callbackUrl) {
+    receiveEmail (email = throwIfMissing`email`, callbackUrl = this.callbackUrl) {
+        if (!Isemail.validate(email)) throw new Error('invalid email format')
+
+        // add email as callbackUrl param
+        callbackUrl = `${callbackUrl}?email=${email}`
+
         // create selective disclosure JWT
         return this.credentials.createRequest({
             ...this.customRequestParams,

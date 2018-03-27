@@ -1,11 +1,19 @@
 import EmailVerifier from '../src'
 
+// mocked
+import * as Isemail from 'isemail'
+jest.mock('isemail', () => ({
+    // NOTE(mike.xu): how to mock this properly?
+    validate: jest.fn(email => email !== 'invalid email@me')
+}))
+
 const CALLBACK_URL = 'https://api.uport.me/verify'
 const USER = 'username'
 const PASS = 'password'
 const HOST = 'smtp.uport.me'
 const PORT = 465
 const EMAIL = 'user@uport.me'
+const INVALID_EMAIL = 'invalid email@me'
 const CUSTOM_REQUEST_PARAMS = {
     requested: ['avatar', 'name'],
     verified: ['custom-attestation-title'],
@@ -61,9 +69,27 @@ describe('constructor', () => {
 describe('receiveEmail', () => {
     beforeEach(() => {
         createRequest.mockClear()
+        Isemail.validate.mockClear()
     })
 
-    it('should throw an error when called with an improperly formatted email address', () => {
+    it('should should attempt to validate the email address', () => {
+        const verifier = new EmailVerifier({
+            ...REQUIRED_SETTINGS
+        })
+        verifier.receiveEmail(EMAIL)
+
+        expect(Isemail.validate.mock.calls.length).toBe(1)
+    })
+
+    it('should throw an error when called without an email address', () => {
+        const verifier = new EmailVerifier({
+            ...REQUIRED_SETTINGS
+        })
+
+        expect(() => verifier.receiveEmail()).toThrow(/email/)
+    })
+
+    it('should throw an error when called with an invalid email address', () => {
         const verifier = new EmailVerifier({
             ...REQUIRED_SETTINGS
         })
@@ -79,7 +105,7 @@ describe('receiveEmail', () => {
         expect.assertions(2)
         return verifier.receiveEmail(EMAIL).then(token => {
             expect(createRequest.mock.calls.length).toBe(1)
-            expect(createRequest.mock.calls[0][0]).toBe({
+            expect(createRequest.mock.calls[0][0]).toEqual({
                 callbackUrl: CALLBACK_WITH_EMAIL,
                 notifications: true,
             })
@@ -95,7 +121,7 @@ describe('receiveEmail', () => {
         expect.assertions(2)
         return verifier.receiveEmail(EMAIL).then(token => {
             expect(createRequest.mock.calls.length).toBe(1)
-            expect(createRequest.mock.calls[0][0]).toBe({
+            expect(createRequest.mock.calls[0][0]).toEqual({
                 callbackUrl: CALLBACK_WITH_EMAIL,
                 notifications: true,
                 ...CUSTOM_REQUEST_PARAMS,

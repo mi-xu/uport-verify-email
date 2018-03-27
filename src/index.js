@@ -1,4 +1,5 @@
 import * as Isemail from 'isemail'
+import * as qr from 'qr-image'
 
 const DEFAULT_CONFIRM_SUBJECT = 'uPort Email Confirmation'
 const DEFAULT_RECEIVE_SUBJECT = 'uPort Email Attestation'
@@ -9,7 +10,9 @@ const DEFAULT_TEMPLATE = qr => `
         <title>Email Template</title>
     </head>
     <body>
-        <div>${qr}</div>
+        <div>
+            <img src="${qr}"></img>
+        </div>
     </body>
     </html>
 `
@@ -82,16 +85,25 @@ class EmailVerifier {
         if (!Isemail.validate(email)) throw new Error('invalid email format')
 
         // add email as callbackUrl param
-        callbackUrl = `${callbackUrl}?email=${email}`
+        const callbackUrlWithEmail = `${callbackUrl}?email=${email}`
 
         // create selective disclosure JWT
         return this.credentials.createRequest({
             ...this.customRequestParams,
-            callbackUrl,
+            callbackUrl: callbackUrlWithEmail,
             notifications: true,
+        }).then(requestToken => {
+            // create uPort request URL from JWT
+            const requestUri = `me.uport:me?requestToken=${requestToken}`
+            // create QR from request URL
+            const requestQrData = qr.imageSync(requestUri, { type: 'png' }).toString('base64')
+            const requestQrUri = `data:image/png;charset=utf-8;base64, ${requestQrData}`
+            // place QR in email template
+            const emailData = confirmTemplate(requestQrUri)
+            // send email
+
+            return requestToken
         })
-        // create QR from JWT
-        // send email
     }
 
     /**

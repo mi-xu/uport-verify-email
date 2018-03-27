@@ -1,10 +1,14 @@
 import EmailVerifier from '../src'
 
-// mocked
 import * as Isemail from 'isemail'
 jest.mock('isemail', () => ({
     // NOTE(mike.xu): how to mock this properly?
     validate: jest.fn(email => email !== 'invalid email@me')
+}))
+
+import * as qr from 'qr-image' 
+jest.mock('qr-image', () => ({
+    imageSync: jest.fn(() => 'base 64 png data')
 }))
 
 const CALLBACK_URL = 'https://api.uport.me/verify'
@@ -52,15 +56,11 @@ describe('constructor', () => {
     })
 
     it('should throw an error when initialized without uPort credentials', () => {
-        expect(() => new EmailVerifier({
-            ...EMAIL_SETTINGS,
-        })).toThrow(/credentials/)
+        expect(() => new EmailVerifier(EMAIL_SETTINGS).toThrow(/credentials/))
     })
 
     it('should return an object when initialized with the required settings', () => {
-        const verifier = new EmailVerifier({
-            ...REQUIRED_SETTINGS
-        })
+        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
 
         expect(verifier).not.toBeNull()
     })
@@ -70,40 +70,33 @@ describe('receiveEmail', () => {
     beforeEach(() => {
         createRequest.mockClear()
         Isemail.validate.mockClear()
+        qr.imageSync.mockClear()
     })
 
     it('should should attempt to validate the email address', () => {
-        const verifier = new EmailVerifier({
-            ...REQUIRED_SETTINGS
-        })
+        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
         verifier.receiveEmail(EMAIL)
 
         expect(Isemail.validate.mock.calls.length).toBe(1)
     })
 
     it('should throw an error when called without an email address', () => {
-        const verifier = new EmailVerifier({
-            ...REQUIRED_SETTINGS
-        })
+        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
 
         expect(() => verifier.receiveEmail()).toThrow(/email/)
     })
 
     it('should throw an error when called with an invalid email address', () => {
-        const verifier = new EmailVerifier({
-            ...REQUIRED_SETTINGS
-        })
+        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
 
         expect(() => verifier.receiveEmail(INVALID_EMAIL)).toThrow(/invalid email format/)
     })
 
     it('should call createRequest with notifications and callback containing the email', () => {
-        const verifier = new EmailVerifier({
-            ...REQUIRED_SETTINGS
-        })
+        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
 
         expect.assertions(2)
-        return verifier.receiveEmail(EMAIL).then(token => {
+        return verifier.receiveEmail(EMAIL).then(result => {
             expect(createRequest.mock.calls.length).toBe(1)
             expect(createRequest.mock.calls[0][0]).toEqual({
                 callbackUrl: CALLBACK_WITH_EMAIL,
@@ -119,7 +112,7 @@ describe('receiveEmail', () => {
         })
 
         expect.assertions(2)
-        return verifier.receiveEmail(EMAIL).then(token => {
+        return verifier.receiveEmail(EMAIL).then(result => {
             expect(createRequest.mock.calls.length).toBe(1)
             expect(createRequest.mock.calls[0][0]).toEqual({
                 callbackUrl: CALLBACK_WITH_EMAIL,
@@ -130,7 +123,12 @@ describe('receiveEmail', () => {
     })
 
     it('should call qr.image with a uPort url containing the request token', () => {
-        expect(true).toBeFalsy()
+        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
+
+        expect.assertions(1)
+        return verifier.receiveEmail(EMAIL).then(result => {
+            expect(qr.imageSync.mock.calls.length).toBe(1)
+        })
     })
 
     it('should create an email containing the selective disclosure request QR', () => {

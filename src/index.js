@@ -1,21 +1,10 @@
 import * as Isemail from 'isemail'
 import * as qr from 'qr-image'
+import * as nodemailer from 'nodemailer'
 
 const DEFAULT_CONFIRM_SUBJECT = 'uPort Email Confirmation'
 const DEFAULT_RECEIVE_SUBJECT = 'uPort Email Attestation'
-const DEFAULT_TEMPLATE = qr => `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Email Template</title>
-    </head>
-    <body>
-        <div>
-            <img src="${qr}"></img>
-        </div>
-    </body>
-    </html>
-`
+const DEFAULT_TEMPLATE = qr => `<div><img src="${qr}"></img></div>`
 
 const throwIfMissing = x => {
     throw new Error(`Missing parameter '${x}'`)
@@ -54,6 +43,7 @@ class EmailVerifier {
         host = throwIfMissing`host`,
         port = throwIfMissing`port`,
         secure = false,
+        from = '"Admin" <foo@example.com>',
         confirmSubject = DEFAULT_CONFIRM_SUBJECT,
         receiveSubject = DEFAULT_RECEIVE_SUBJECT,
         confirmTemplate = DEFAULT_TEMPLATE,
@@ -62,16 +52,34 @@ class EmailVerifier {
         credentials = throwIfMissing`credentials`,
     } = {}) {
         this.callbackUrl = callbackUrl
-        this.user = user
-        this.pass = pass
-        this.host = host
-        this.secure = secure
+        // this.user = user
+        // this.pass = pass
+        // this.host = host
+        // this.port = port
+        // this.secure = secure
+        this.from = from
         this.confirmSubject = confirmSubject
         this.receiveSubject = receiveSubject
         this.confirmTemplate = confirmTemplate
         this.receiveTemplate = receiveTemplate
         this.customRequestParams = customRequestParams
         this.credentials = credentials
+        // this.transporter = nodemailer.createTransport({
+        //     host,
+        //     port,
+        //     secure,
+        //     auth: {
+        //         user,
+        //         pass,
+        //     }
+        // })
+        this.transporter = nodemailer.createTransport({
+            service: 'Gmail',
+            auth: {
+                user,
+                pass,
+            },
+        })
     }
 
     /**
@@ -96,12 +104,31 @@ class EmailVerifier {
             // create uPort request URL from JWT
             const requestUri = `me.uport:me?requestToken=${requestToken}`
             // create QR from request URL
-            const requestQrData = qr.imageSync(requestUri, { type: 'png' }).toString('base64')
-            const requestQrUri = `data:image/png;charset=utf-8;base64, ${requestQrData}`
-            // place QR in email template
-            const emailData = confirmTemplate(requestQrUri)
-            // send email
-
+            // const requestQrData = qr.imageSync(requestUri, { type: 'png' }).toString('base64')
+            // const requestQrUri = `data:image/png;charset=utf-8;base64, ${requestQrData}`
+            const requestQrData = qr.image(requestUri, { type: 'png' })
+            requestQrData
+                .pipe(require('fs').createWriteStream('QR.png'))
+                .on('finish', () => {
+                    // place QR in email template
+                    const emailHtml = this.confirmTemplate('cid:unique@cid')
+                    // send email
+                    const emailOptions = {
+                        from: this.from,
+                        to: email,
+                        subject: this.confirmSubject,
+                        html: emailHtml,
+                        attachments: [{
+                            filename: 'QR.png',
+                            path: './QR.png',
+                            cid: 'unique@cid',
+                        }],
+                    }
+                    this.transporter.sendMail(emailOptions, (error, info) => {
+                        if (error) return console.log(error)
+                        console.log(info)
+                    })
+                })
             return requestToken
         })
     }

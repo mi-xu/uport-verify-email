@@ -1,8 +1,11 @@
+import { createWriteStream, unlink } from 'fs'
+import { randomBytes } from 'crypto'
+import * as url from 'url'
+
 import * as Isemail from 'isemail'
 import * as qr from 'qr-image'
 import * as nodemailer from 'nodemailer'
-import { createWriteStream, unlink } from 'fs'
-import { randomBytes } from 'crypto'
+import * as jwtDecode from 'jwt-decode'
 
 const DEFAULT_CONFIRM_SUBJECT = 'uPort Email Confirmation'
 const DEFAULT_RECEIVE_SUBJECT = 'uPort Email Attestation'
@@ -84,6 +87,8 @@ class EmailVerifier {
         this.customRequestParams = customRequestParams
     }
 
+    // TODO(mike.xu): promisify the QR image and email stuff
+    // TODO(mike.xu): handle errors that can occur after creating request token
     /**
      * Generates a selective disclosure request and sends an email containing the request QR.
      * 
@@ -105,10 +110,11 @@ class EmailVerifier {
         }).then(requestToken => {
             // create uPort request URL from JWT
             const requestUri = `me.uport:me?requestToken=${requestToken}`
-            // create QR from request URL
-            const requestQrData = qr.image(requestUri, { type: 'png' })
+
             // NOTE(mike.xu): how to calculate the minimum random bytes needed as a function of max images written on fs at once?
-            const filename = `QR-${randomBytes(8).toString('hex')}.png`;
+            const filename = `QR-${randomBytes(8).toString('hex')}.png`
+            // create QR from request URL
+            const requestQrData = qr.image(requestUri, {type: 'png'})
             requestQrData
                 .pipe(createWriteStream(filename))
                 .on('finish', () => {
@@ -147,11 +153,74 @@ class EmailVerifier {
      * @param {boolean} settings.sendEmail - flag to send email attestation via email containing QR code
      */
     verify (accessToken, settings = {sendPush: true, sendEmail: true}) {
+        const sendPush = !(settings.sendPush === false)
+        const sendEmail = !(settings.sendEmail === false)
+
+        // TODO(mike.xu): figure out how to import this properly and not have to call default
+        const requestToken = jwtDecode.default(accessToken).req
+        /**
+         * NOTE(mike.xu): if email is passed through callback url, take it as a param passed from endpoint
+         * would it be possible for someone to modify the email in the callback url?
+         * if email is passed as a property in the request token, need to parse it out
+         */
+        const callbackUrlWithEmail = jwtDecode.default(requestToken).callback
+        const email = url.parse(callbackUrlWithEmail, true).query.email
+
+        let identity = null
+        let attestation = null
+        let attestationUri = null
+
         return this.credentials.receive(accessToken)
-        .then(identity => {
+        .then(result => {
+            identity = result
+            return this.credentials.attest({
+                sub: identity.address,
+                claim: {email}
+            })
+        })
+        .then(result => {
+            attestation = result
+            attestationUri = `me.uport:add?attestations=${attestation}`
+            if (sendPush) {
+                return this.credentials.push(
+                    identity.pushToken,
+                    {url: attestationUri}
+                )
+            } else {
+                return new Promise((resolve, reject) => (resolve(attestation)))
+            }
+        })
+        .then(result => {
+            if (sendEmail) {
+                const filename = `QR-${randomBytes(8).toString('hex')}.png`
+                const attestationQrData = qr.image(attestationUri, {type: 'png'})
+                attestationQrData
+                    .pipe(createWriteStream(filename))
+                    .on('finish', () => {
+                        const emailHtml = this.receiveTemplate(`cid:${filename}`)
+                        const emailOptions = {
+                            from: this.from,
+                            to: email,
+                            subject: this.receiveSubject,
+                            html: emailHtml,
+                            attachments: [{
+                                filename: filename,
+                                path: `./${filename}`,
+                                cid: filename,
+                            }],
+                        }
+                        this.transporter.sendMail(emailOptions, (error, info) => {
+                            if (error) return console.log(error)
+                            unlink(filename, error => {
+                                if (error) console.log('unlink error', error)
+                            })
+                        })
+                    })
+            }
             return {
-                address: identity.address,
-                pushToken: identity.pushToken,
+                ...identity,
+                attestation,
+                email: email,
                 accessToken: accessToken
             }
         })

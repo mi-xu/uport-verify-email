@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "isemail": "^3.1.1",
+    "jwt-decode": "^2.2.0",
     "nodemailer": "^4.6.3",
     "qr-image": "^3.2.0"
   }

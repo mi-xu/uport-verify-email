@@ -35,10 +35,11 @@ jest.mock('nodemailer', () => ({
 import * as nodemailer from 'nodemailer'
 
 const CALLBACK_URL = 'https://api.uport.me/verify'
-const USER = 'username'
-const PASS = 'password'
+const SERVICE = 'gmail'
 const HOST = 'smtp.uport.me'
 const PORT = 465
+const USER = 'username'
+const PASS = 'password'
 const EMAIL = 'user@uport.me'
 const INVALID_EMAIL = 'invalid email@me'
 const CUSTOM_REQUEST_PARAMS = {
@@ -54,37 +55,86 @@ const CREDENTIALS = {
 }
 
 const CALLBACK_WITH_EMAIL = `${CALLBACK_URL}?email=${EMAIL}`
-const EMAIL_SETTINGS = {
-    callbackUrl: CALLBACK_URL,
+const MAIL_AUTH_PARAMS = {
     user: USER,
     pass: PASS,
+}
+const MAIL_SERVER_PARAMS = {
     host: HOST,
     port: PORT,
 }
-const REQUIRED_SETTINGS = {
-    ...EMAIL_SETTINGS,
+const VALID_PARAMS = {
     credentials: CREDENTIALS,
+    callbackUrl: CALLBACK_URL,
+    ...MAIL_AUTH_PARAMS,
+    service: SERVICE,
 }
 
 describe('constructor', () => {
-    it('should throw an error when initialized without callbackUrl', () => {
-        expect(() => new EmailVerifier()).toThrow(/callbackUrl/)
-    })
-
-    it('should throw an error when initialized without email configs', () => {
+    it('should throw an error when initialized without uPort credentials', () => {
         expect(() => new EmailVerifier({
             callbackUrl: CALLBACK_URL,
+            ...MAIL_AUTH_PARAMS,
+            service: SERVICE,
+        }).toThrow(/credentials/))
+    })
+
+    it('should throw an error when initialized without callbackUrl', () => {
+        expect(() => new EmailVerifier({
+            credentials: CREDENTIALS,
+            ...MAIL_AUTH_PARAMS,
+            service: SERVICE,
+        })).toThrow(/callbackUrl/)
+    })
+
+    it('should throw an error when initialized without an email user', () => {
+        expect(() => new EmailVerifier({
+            credentials: CREDENTIALS,
+            callbackUrl: CALLBACK_URL,
+            pass: PASS,
+            service: SERVICE,
         })).toThrow(/user/)
     })
 
-    it('should throw an error when initialized without uPort credentials', () => {
-        expect(() => new EmailVerifier(EMAIL_SETTINGS).toThrow(/credentials/))
+    it('should throw an error when initialized without an email password', () => {
+        expect(() => new EmailVerifier({
+            credentials: CREDENTIALS,
+            callbackUrl: CALLBACK_URL,
+            user: USER,
+            service: SERVICE,
+        })).toThrow(/pass/)
     })
 
-    it('should return an object when initialized with the required settings', () => {
-        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
+    it('should throw an error when initialized without email service or server params', () => {
+        expect(() => new EmailVerifier({
+            credentials: CREDENTIALS,
+            callbackUrl: CALLBACK_URL,
+            ...MAIL_AUTH_PARAMS,
+        })).toThrow(/email/)
+    })
 
-        expect(verifier).not.toBeNull()
+    it('should return an EmailVerifier when initialized with mail service params', () => {
+        expect(new EmailVerifier({
+            credentials: CREDENTIALS,
+            callbackUrl: CALLBACK_URL,
+            ...MAIL_AUTH_PARAMS,
+            service: SERVICE,
+        })).toEqual(expect.objectContaining({
+            receive: expect.any(Function),
+            verify: expect.any(Function),
+        }))
+    })
+
+    it('should return an EmailVerifier when initialized with mail server params', () => {
+        expect(new EmailVerifier({
+            credentials: CREDENTIALS,
+            callbackUrl: CALLBACK_URL,
+            ...MAIL_AUTH_PARAMS,
+            ...MAIL_SERVER_PARAMS,
+        })).toEqual(expect.objectContaining({
+            receive: expect.any(Function),
+            verify: expect.any(Function),
+        }))
     })
 })
 
@@ -98,26 +148,26 @@ describe('receive', () => {
     })
 
     it('should should attempt to validate the email address', () => {
-        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
+        const verifier = new EmailVerifier(VALID_PARAMS)
         verifier.receive(EMAIL)
 
         expect(Isemail.validate.mock.calls.length).toBe(1)
     })
 
     it('should throw an error when called without an email address', () => {
-        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
+        const verifier = new EmailVerifier(VALID_PARAMS)
 
         expect(() => verifier.receive()).toThrow(/email/)
     })
 
     it('should throw an error when called with an invalid email address', () => {
-        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
+        const verifier = new EmailVerifier(VALID_PARAMS)
 
         expect(() => verifier.receive(INVALID_EMAIL)).toThrow(/invalid email format/)
     })
 
     it('should call createRequest with notifications and callback containing the email', () => {
-        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
+        const verifier = new EmailVerifier(VALID_PARAMS)
         const createRequestCalls = verifier.credentials.createRequest.mock.calls
 
         expect.assertions(2)
@@ -132,7 +182,7 @@ describe('receive', () => {
 
     it('should call createRequest with custom request params', () => {
         const verifier = new EmailVerifier({
-            ...REQUIRED_SETTINGS,
+            ...VALID_PARAMS,
             customRequestParams: CUSTOM_REQUEST_PARAMS,
         })
         const createRequestCalls = verifier.credentials.createRequest.mock.calls
@@ -149,7 +199,7 @@ describe('receive', () => {
     })
 
     it('should call qr.image with a uPort url containing the request token', () => {
-        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
+        const verifier = new EmailVerifier(VALID_PARAMS)
 
         expect.assertions(1)
         return verifier.receive(EMAIL).then(result => {
@@ -158,7 +208,7 @@ describe('receive', () => {
     })
 
     it('should save the QR image to a png file', () => {
-        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
+        const verifier = new EmailVerifier(VALID_PARAMS)
 
         expect.assertions(1)
         return verifier.receive(EMAIL).then(result => {
@@ -167,7 +217,7 @@ describe('receive', () => {
     })
 
     it('should send an email with the QR image attached', () => {
-        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
+        const verifier = new EmailVerifier(VALID_PARAMS)
 
         expect.assertions(2)
         return verifier.receive(EMAIL).then(result => {
@@ -181,7 +231,7 @@ describe('receive', () => {
     })
 
     it('should delete the QR png after sending the email', () => {
-        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
+        const verifier = new EmailVerifier(VALID_PARAMS)
 
         expect.assertions(2)
         return verifier.receive(EMAIL).then(result => {

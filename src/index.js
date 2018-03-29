@@ -21,29 +21,33 @@ class EmailVerifier {
 
     /**
      * Instantiates a new Email Verifier object.
+     * Requires specifying a sending email account by either service (ex: gmail) or server host and port.
      * 
      * @constructor
      * 
      * @param   {Object}        settings - settings
+     * @param   {Credentials}   settings.credentials - uPort Credentials object
      * @param   {string}        settings.callbackUrl - endpoint to call when user scans email verification QR
      * @param   {string}        settings.user - sender email address
      * @param   {string}        settings.pass - sender email password
-     * @param   {string}        settings.host - mail server host name
-     * @param   {number}        settings.port - mail server port number
+     * @param   {string}        [settings.service] - mail service, takes precedence over mail server params
+     * @param   {string}        [settings.host] - mail server host name
+     * @param   {number}        [settings.port] - mail server port number
      * @param   {boolean}       [settings.secure=false] - TLS flag
      * @param   {string}        [settings.confirmSubject] - confirmation email subject
      * @param   {string}        [settings.receiveSubject] - receive attestation email subject
      * @param   {template}      [settings.confirmTemplate] - confirmation email template
      * @param   {template}      [settings.receiveTemplate] - receive attestation email template
      * @param   {Object}        [settings.customRequestParams] - custom params for credentials.createRequest()
-     * @param   {Credentials}   settings.credentials - uPort Credentials object
      */
     constructor ({
+        credentials = throwIfMissing`credentials`,
         callbackUrl = throwIfMissing`callbackUrl`,
         user = throwIfMissing`user`,
         pass = throwIfMissing`pass`,
-        host = throwIfMissing`host`,
-        port = throwIfMissing`port`,
+        service = null,
+        host = null,
+        port = null,
         secure = false,
         from = '"Admin" <foo@example.com>',
         confirmSubject = DEFAULT_CONFIRM_SUBJECT,
@@ -51,31 +55,20 @@ class EmailVerifier {
         confirmTemplate = DEFAULT_TEMPLATE,
         receiveTemplate = DEFAULT_TEMPLATE,
         customRequestParams = {},
-        credentials = throwIfMissing`credentials`,
     } = {}) {
-        this.callbackUrl = callbackUrl
-        // this.user = user
-        // this.pass = pass
-        // this.host = host
-        // this.port = port
-        // this.secure = secure
-        this.from = from
-        this.confirmSubject = confirmSubject
-        this.receiveSubject = receiveSubject
-        this.confirmTemplate = confirmTemplate
-        this.receiveTemplate = receiveTemplate
-        this.customRequestParams = customRequestParams
         this.credentials = credentials
-        // TODO(mike.xu): add service param and make it XOR user, pass, host
-        // this.transporter = nodemailer.createTransport({
-        //     host,
-        //     port,
-        //     secure,
-        //     auth: {
-        //         user,
-        //         pass,
-        //     }
-        // })
+        this.callbackUrl = callbackUrl
+        const transportOptions = {auth: {user, pass}}
+        const server = !!host && !!port
+        if (!!service) {
+            transportOptions.service = service
+        } else if (!!host && !!port) {
+            transportOptions.host = host 
+            transportOptions.port = port
+            transportOptions.secure = secure
+        } else {
+            throw new Error('Missing email service or server params')
+        }
         this.transporter = nodemailer.createTransport({
             service: 'Gmail',
             auth: {
@@ -83,6 +76,12 @@ class EmailVerifier {
                 pass,
             },
         })
+        this.from = from
+        this.confirmSubject = confirmSubject
+        this.receiveSubject = receiveSubject
+        this.confirmTemplate = confirmTemplate
+        this.receiveTemplate = receiveTemplate
+        this.customRequestParams = customRequestParams
     }
 
     /**

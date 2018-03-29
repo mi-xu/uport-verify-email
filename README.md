@@ -11,18 +11,20 @@ const uPortApp = new Credentials({..., signer: new SimpleSigner(...)})
 // set up the email account for sending verification QRs
 // pass the uport app credentials
 const verifier = new EmailVerifier({
+    credentials: uPortApp,
+    callbackUrl: 'https://api.uport.me/verify',
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
-    port: 465,
-    host: 'smtp.uport.me',
-    secure: true, // use TLS
+    service: 'gmail',
+    // as an alternative to service, can take the transport params
+    // host: string (ex: 'smtp.uport.me')
+    // port: number (ex: 465)
+    // secure: boolean (ex: true for TLS)
     confirmationSubject: 'uPort Identity ',
     confirmationTemplate: qr => `<html>...${qr}...</html>`,
     attestationSubject: 'uPort Email Attestation',
     attestationTemplate: qr => `<html>...${qr}...</html>`,
-    callbackUrl: 'https://api.uport.me/verify',
     customRequestParams: {},
-    credentials: uPortApp,
 })
 ```
 

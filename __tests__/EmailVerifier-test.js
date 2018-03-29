@@ -1,16 +1,38 @@
 import EmailVerifier from '../src'
 
-import * as Isemail from 'isemail'
 jest.mock('isemail', () => ({
-    // NOTE(mike.xu): how to mock this properly?
+    // NOTE(mike.xu): this string should match INVALID_EMAIL
     validate: jest.fn(email => email !== 'invalid email@me')
 }))
+import * as Isemail from 'isemail'
 
-import * as qr from 'qr-image' 
 jest.mock('qr-image', () => ({
-    imageSync: jest.fn(() => 'base 64 png data'),
-    image: jest.fn(() => ({pipe: () => ('base 64 png data')})),
+    image: jest.fn(() => ({
+        pipe: () => ({
+            on: (event, cb) => {
+                cb()
+            },
+        })
+    })),
 }))
+import * as qr from 'qr-image' 
+
+jest.mock('fs', () => ({
+    createWriteStream: jest.fn(),
+    unlink: jest.fn((filename, cb) => { cb(null) })
+}))
+import { createWriteStream, unlink } from 'fs'
+
+jest.mock('crypto', () => ({
+    randomBytes: jest.fn(() => (Buffer.from([0x00])))
+}))
+
+jest.mock('nodemailer', () => ({
+    createTransport: () => ({
+        sendMail: jest.fn((emailOptions, cb) => { cb(null, {}) }),
+    }),
+}))
+import * as nodemailer from 'nodemailer'
 
 const CALLBACK_URL = 'https://api.uport.me/verify'
 const USER = 'username'
@@ -23,13 +45,12 @@ const CUSTOM_REQUEST_PARAMS = {
     requested: ['avatar', 'name'],
     verified: ['custom-attestation-title'],
 }
-const createRequest = jest.fn(args => (
-    new Promise((resolve, reject) => {
-        resolve('JWT')
-    })
-))
+// TODO(mike.xu): set this to be an actual example JWT
+const REQUEST_TOKEN = 'JWT'
 const CREDENTIALS = {
-    createRequest
+    createRequest: jest.fn(args => (
+        new Promise((resolve, reject) => { resolve(REQUEST_TOKEN) })
+    ))
 }
 
 const CALLBACK_WITH_EMAIL = `${CALLBACK_URL}?email=${EMAIL}`
@@ -67,17 +88,18 @@ describe('constructor', () => {
     })
 })
 
-describe('receiveEmail', () => {
+describe('receive', () => {
     beforeEach(() => {
-        createRequest.mockClear()
+        CREDENTIALS.createRequest.mockClear()
         Isemail.validate.mockClear()
-        // qr.imageSync.mockClear()
         qr.image.mockClear()
+        createWriteStream.mockClear()
+        unlink.mockClear()
     })
 
     it('should should attempt to validate the email address', () => {
         const verifier = new EmailVerifier(REQUIRED_SETTINGS)
-        verifier.receiveEmail(EMAIL)
+        verifier.receive(EMAIL)
 
         expect(Isemail.validate.mock.calls.length).toBe(1)
     })
@@ -85,22 +107,23 @@ describe('receiveEmail', () => {
     it('should throw an error when called without an email address', () => {
         const verifier = new EmailVerifier(REQUIRED_SETTINGS)
 
-        expect(() => verifier.receiveEmail()).toThrow(/email/)
+        expect(() => verifier.receive()).toThrow(/email/)
     })
 
     it('should throw an error when called with an invalid email address', () => {
         const verifier = new EmailVerifier(REQUIRED_SETTINGS)
 
-        expect(() => verifier.receiveEmail(INVALID_EMAIL)).toThrow(/invalid email format/)
+        expect(() => verifier.receive(INVALID_EMAIL)).toThrow(/invalid email format/)
     })
 
     it('should call createRequest with notifications and callback containing the email', () => {
         const verifier = new EmailVerifier(REQUIRED_SETTINGS)
+        const createRequestCalls = verifier.credentials.createRequest.mock.calls
 
         expect.assertions(2)
-        return verifier.receiveEmail(EMAIL).then(result => {
-            expect(createRequest.mock.calls.length).toBe(1)
-            expect(createRequest.mock.calls[0][0]).toEqual({
+        return verifier.receive(EMAIL).then(result => {
+            expect(createRequestCalls.length).toBe(1)
+            expect(createRequestCalls[0][0]).toEqual({
                 callbackUrl: CALLBACK_WITH_EMAIL,
                 notifications: true,
             })
@@ -112,11 +135,12 @@ describe('receiveEmail', () => {
             ...REQUIRED_SETTINGS,
             customRequestParams: CUSTOM_REQUEST_PARAMS,
         })
+        const createRequestCalls = verifier.credentials.createRequest.mock.calls
 
         expect.assertions(2)
-        return verifier.receiveEmail(EMAIL).then(result => {
-            expect(createRequest.mock.calls.length).toBe(1)
-            expect(createRequest.mock.calls[0][0]).toEqual({
+        return verifier.receive(EMAIL).then(result => {
+            expect(createRequestCalls.length).toBe(1)
+            expect(createRequestCalls[0][0]).toEqual({
                 callbackUrl: CALLBACK_WITH_EMAIL,
                 notifications: true,
                 ...CUSTOM_REQUEST_PARAMS,
@@ -128,21 +152,42 @@ describe('receiveEmail', () => {
         const verifier = new EmailVerifier(REQUIRED_SETTINGS)
 
         expect.assertions(1)
-        return verifier.receiveEmail(EMAIL).then(result => {
-            // expect(qr.imageSync.mock.calls.length).toBe(1)
+        return verifier.receive(EMAIL).then(result => {
             expect(qr.image.mock.calls.length).toBe(1)
         })
     })
 
-    // it('should create an email containing the selective disclosure request QR', () => {
-    //     expect(true).toBeFalsy()
-    // })
+    it('should save the QR image to a png file', () => {
+        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
 
-    // it('should call sendMail from the nodemailer transporter with the QR email', () => {
-    //     expect(true).toBeFalsy()
-    // })
+        expect.assertions(1)
+        return verifier.receive(EMAIL).then(result => {
+            expect(createWriteStream.mock.calls.length).toBe(1)
+        })
+    })
 
-    // it('should return the selective disclosure request token', () => {
-    //     expect(true).toBeFalsy()
-    // })
+    it('should send an email with the QR image attached', () => {
+        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
+
+        expect.assertions(2)
+        return verifier.receive(EMAIL).then(result => {
+            const filename = createWriteStream.mock.calls[0][0]
+            const sendMailCalls = verifier.transporter.sendMail.mock.calls
+            expect(sendMailCalls.length).toBe(1)
+            expect(sendMailCalls[0][0].attachments).toContainEqual(
+                expect.objectContaining({ filename })
+            )
+        })
+    })
+
+    it('should delete the QR png after sending the email', () => {
+        const verifier = new EmailVerifier(REQUIRED_SETTINGS)
+
+        expect.assertions(2)
+        return verifier.receive(EMAIL).then(result => {
+            const filename = createWriteStream.mock.calls[0][0]
+            expect(unlink.mock.calls.length).toBe(1)
+            expect(unlink.mock.calls[0][0]).toBe(filename)
+        })
+    })
 })

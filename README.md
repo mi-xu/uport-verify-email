@@ -32,7 +32,7 @@ const verifier = new EmailVerifier({
 const email = params.email
 
 // send an email to user containing the request QR and return the token
-const requestToken = verifier.receiveEmail(email)
+const requestToken = verifier.receive(email)
 ```
 
 ## Handling callback after user scans QR from their email

@@ -116,7 +116,7 @@ class EmailVerifier {
      * @param {string} accessToken - access token sent by uPort mobile in response to selective disclosure request
      * @param {Object} [settings] - options to send email attestation
      * @param {boolean} settings.sendPush - flag to send email attestation via push notification
-     * @param {boolean} settings._sendEmail - flag to send email attestation via email containing QR code
+     * @param {boolean} settings.sendEmail - flag to send email attestation via email containing QR code
      */
     async verify(
         accessToken,

@@ -1,5 +1,7 @@
 /node_modules
 /lib
 /coverage
+/docs
+
 *.log
 .DS_Store

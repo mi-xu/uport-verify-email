@@ -167,104 +167,83 @@ describe('receive', () => {
         unlink.mockClear()
     })
 
-    it('should should attempt to validate the email address', () => {
+    it('should should attempt to validate the email address', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-        verifier.receive(EMAIL)
-
+        await verifier.receive(EMAIL)
         expect(Isemail.validate.mock.calls.length).toBe(1)
     })
 
-    it('should throw an error when called without an email address', () => {
+    it('should throw an error when called without an email address', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
         expect(() => verifier.receive()).toThrow(/email/)
     })
 
-    it('should throw an error when called with an invalid email address', () => {
+    it('should throw an error when called with an invalid email address', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        expect(() => verifier.receive(INVALID_EMAIL)).toThrow(/invalid email format/)
+        await expect(verifier.receive(INVALID_EMAIL)).rejects.toMatch(/invalid email format/)
     })
 
-    it('should create a credential request with notifications and callback containing the email', () => {
+    it('should create a credential request with notifications and callback containing the email', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
         const createRequestCalls = verifier.credentials.createRequest.mock.calls
-
-        expect.assertions(2)
-        return verifier.receive(EMAIL).then(result => {
-            expect(createRequestCalls.length).toBe(1)
-            expect(createRequestCalls[0][0]).toEqual({
-                callbackUrl: CALLBACK_WITH_EMAIL,
-                notifications: true,
-            })
+        await verifier.receive(EMAIL)
+        expect(createRequestCalls.length).toBe(1)
+        expect(createRequestCalls[0][0]).toEqual({
+            callbackUrl: CALLBACK_WITH_EMAIL,
+            notifications: true,
         })
     })
 
-    it('should create a credential request with custom request params', () => {
+    it('should create a credential request with custom request params', async () => {
         const verifier = new EmailVerifier({
             ...VALID_PARAMS,
             customRequestParams: CUSTOM_REQUEST_PARAMS,
         })
         const createRequestCalls = verifier.credentials.createRequest.mock.calls
-
-        expect.assertions(2)
-        return verifier.receive(EMAIL).then(result => {
-            expect(createRequestCalls.length).toBe(1)
-            expect(createRequestCalls[0][0]).toEqual({
-                callbackUrl: CALLBACK_WITH_EMAIL,
-                notifications: true,
-                ...CUSTOM_REQUEST_PARAMS,
-            })
+        await verifier.receive(EMAIL)
+        expect(createRequestCalls.length).toBe(1)
+        expect(createRequestCalls[0][0]).toEqual({
+            callbackUrl: CALLBACK_WITH_EMAIL,
+            notifications: true,
+            ...CUSTOM_REQUEST_PARAMS,
         })
     })
 
-    it('should create a QR for a uPort url containing the request token', () => {
+    it('should create a QR for a uPort url containing the request token', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        expect.assertions(2)
-        return verifier.receive(EMAIL).then(result => {
-            const imageCalls = qr.image.mock.calls
-            expect(imageCalls.length).toBe(1)
-            expect(imageCalls[0][0]).toEqual(expect.stringContaining(REQUEST_TOKEN))
-        })
+        const imageCalls = qr.image.mock.calls
+        await verifier.receive(EMAIL)
+        expect(imageCalls.length).toBe(1)
+        expect(imageCalls[0][0]).toEqual(expect.stringContaining(REQUEST_TOKEN))
     })
 
-    it('should save the request QR image to a file', () => {
+    it('should save the request QR image to a file', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        expect.assertions(1)
-        return verifier.receive(EMAIL).then(result => {
-            expect(createWriteStream.mock.calls.length).toBe(1)
-        })
+        await verifier.receive(EMAIL)
+        expect(createWriteStream.mock.calls.length).toBe(1)
     })
 
-    it('should send an email with the request QR image attached', () => {
+    it('should send an email with the request QR image attached', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        expect.assertions(2)
-        return verifier.receive(EMAIL).then(result => {
-            const filename = createWriteStream.mock.calls[0][0]
-            const sendMailCalls = verifier.transporter.sendMail.mock.calls
-            expect(sendMailCalls.length).toBe(1)
-            expect(sendMailCalls[0][0].attachments).toContainEqual(
-                expect.objectContaining({ filename })
-            )
-        })
+        const sendMailCalls = verifier.transporter.sendMail.mock.calls
+        await verifier.receive(EMAIL)
+        const filename = createWriteStream.mock.calls[0][0]
+        expect(sendMailCalls.length).toBe(1)
+        expect(sendMailCalls[0][0].attachments).toContainEqual(
+            expect.objectContaining({ filename })
+        )
     })
 
-    it('should delete the request QR image after sending the email', () => {
+    it('should delete the request QR image after sending the email', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        expect.assertions(3)
-        return verifier.receive(EMAIL).then(result => {
-            const filename = createWriteStream.mock.calls[0][0]
-            const unlinkCalls = unlink.mock.calls
-            expect(verifier.transporter.sendMail.mock.calls.length).toBe(1)
-            // TODO(mike.xu): figure out how to assert order of mocked function calls
-            // NOTE(mike.xu): mock.timestamps only has ms precision, not enough to tell
-            expect(unlinkCalls.length).toBe(1)
-            expect(unlinkCalls[0][0]).toBe(filename)
-        })
+        const unlinkCalls = unlink.mock.calls
+        await verifier.receive(EMAIL)
+        const filename = createWriteStream.mock.calls[0][0]
+        expect(verifier.transporter.sendMail.mock.calls.length).toBe(1)
+        // TODO(mike.xu): figure out how to assert order of mocked function calls
+        // NOTE(mike.xu): mock.timestamps only has ms precision, not enough to tell
+        expect(unlinkCalls.length).toBe(1)
+        expect(unlinkCalls[0][0]).toBe(filename)
     })
 })
 
@@ -297,124 +276,95 @@ describe('verify', () => {
         unlink.mockClear()
     })
 
-    it('should create and sign an attestation claiming the email', () => {
+    it('should create and sign an attestation claiming the email', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        expect.assertions(2)
-        return verifier.verify(ACCESS_TOKEN).then(result => {
-            const attestCalls = CREDENTIALS.attest.mock.calls
-            expect(attestCalls.length).toBe(1)
-            expect(attestCalls[0][0]).toEqual({
-                sub: ADDRESS,
-                claim: { email: EMAIL },
-            })
+        const attestCalls = CREDENTIALS.attest.mock.calls
+        await verifier.verify(ACCESS_TOKEN)
+        expect(attestCalls.length).toBe(1)
+        expect(attestCalls[0][0]).toEqual({
+            sub: ADDRESS,
+            claim: { email: EMAIL },
         })
     })
 
-    it('should send a push notification containing the attestation', () => {
+    it('should send a push notification containing the attestation', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        expect.assertions(3)
-        return verifier.verify(ACCESS_TOKEN).then(result => {
-            const pushCalls = CREDENTIALS.push.mock.calls
-            expect(pushCalls.length).toBe(1)
-            expect(pushCalls[0][0]).toBe(PUSH_TOKEN)
-            expect(pushCalls[0][1]).toEqual(expect.objectContaining({
-                url: expect.stringContaining(ATTESTATION)
-            }))
-        })
+        const pushCalls = CREDENTIALS.push.mock.calls
+        await verifier.verify(ACCESS_TOKEN)
+        expect(pushCalls.length).toBe(1)
+        expect(pushCalls[0][0]).toBe(PUSH_TOKEN)
+        expect(pushCalls[0][1]).toEqual(expect.objectContaining({
+            url: expect.stringContaining(ATTESTATION)
+        }))
     })
 
-    it('should optionally skip sending a push notification', () => {
+    it('should optionally skip sending a push notification', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        expect.assertions(1)
-        return verifier.verify(ACCESS_TOKEN, {sendPush: false}).then(result => {
-            expect(CREDENTIALS.push.mock.calls.length).toBe(0)
-        })
+        await verifier.verify(ACCESS_TOKEN, {sendPush: false})
+        expect(CREDENTIALS.push.mock.calls.length).toBe(0)
     })
 
-    it('should create a QR for a uPort url containing the attestation', () => {
+    it('should create a QR for a uPort url containing the attestation', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        expect.assertions(2)
-        return verifier.verify(ACCESS_TOKEN).then(result => {
-            const imageCalls = qr.image.mock.calls
-            expect(imageCalls.length).toBe(1)
-            expect(imageCalls[0][0]).toEqual(expect.stringContaining(ATTESTATION))
-        })
+        const imageCalls = qr.image.mock.calls
+        await verifier.verify(ACCESS_TOKEN)
+        expect(imageCalls.length).toBe(1)
+        expect(imageCalls[0][0]).toEqual(expect.stringContaining(ATTESTATION))
     })
 
-    it('should save the attestation QR image to a file', () => {
+    it('should save the attestation QR image to a file', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        expect.assertions(1)
-        return verifier.verify(ACCESS_TOKEN).then(result => {
-            expect(createWriteStream.mock.calls.length).toBe(1)
-        })
+        await verifier.verify(ACCESS_TOKEN)
+        expect(createWriteStream.mock.calls.length).toBe(1)
     })
 
-    it('should send an email with the attestation QR image attached', () => {
+    it('should send an email with the attestation QR image attached', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        expect.assertions(2)
-        return verifier.verify(ACCESS_TOKEN).then(result => {
-            const filename = createWriteStream.mock.calls[0][0]
-            const sendMailCalls = verifier.transporter.sendMail.mock.calls
-            expect(sendMailCalls.length).toBe(1)
-            expect(sendMailCalls[0][0].attachments).toContainEqual(
-                expect.objectContaining({ filename })
-            )
-        })
+        const sendMailCalls = verifier.transporter.sendMail.mock.calls
+        await verifier.verify(ACCESS_TOKEN)
+        const filename = createWriteStream.mock.calls[0][0]
+        expect(sendMailCalls.length).toBe(1)
+        expect(sendMailCalls[0][0].attachments).toContainEqual(
+            expect.objectContaining({ filename })
+        )
     })
 
-    it('should delete the attestation QR image after sending the email', () => {
+    it('should delete the attestation QR image after sending the email', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        expect.assertions(3)
-        return verifier.verify(EMAIL).then(result => {
-            const filename = createWriteStream.mock.calls[0][0]
-            const unlinkCalls = unlink.mock.calls
-            expect(verifier.transporter.sendMail.mock.calls.length).toBe(1)
-            expect(unlinkCalls.length).toBe(1)
-            expect(unlinkCalls[0][0]).toBe(filename)
-        })
+        const unlinkCalls = unlink.mock.calls
+        await verifier.verify(EMAIL)
+        const filename = createWriteStream.mock.calls[0][0]
+        expect(verifier.transporter.sendMail.mock.calls.length).toBe(1)
+        expect(unlinkCalls.length).toBe(1)
+        expect(unlinkCalls[0][0]).toBe(filename)
     })
 
-    it('should optionally skip sending an email', () => {
+    it('should optionally skip sending an email', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        expect.assertions(4)
-        return verifier.verify(EMAIL, {sendEmail: false}).then(result => {
-            expect(qr.image.mock.calls.length).toBe(0)
-            expect(createWriteStream.mock.calls.length).toBe(0)
-            expect(verifier.transporter.sendMail.mock.calls.length).toBe(0)
-            expect(unlink.mock.calls.length).toBe(0)
-        })
+        await verifier.verify(EMAIL, {sendEmail: false})
+        expect(qr.image.mock.calls.length).toBe(0)
+        expect(createWriteStream.mock.calls.length).toBe(0)
+        expect(verifier.transporter.sendMail.mock.calls.length).toBe(0)
+        expect(unlink.mock.calls.length).toBe(0)
     })
 
-    it('should optionally skip sending a push notification and email', () => {
+    it('should optionally skip sending a push notification and email', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        expect.assertions(5)
-        return verifier.verify(EMAIL, {sendPush: false, sendEmail: false}).then(result => {
-            expect(CREDENTIALS.push.mock.calls.length).toBe(0)
-            expect(qr.image.mock.calls.length).toBe(0)
-            expect(createWriteStream.mock.calls.length).toBe(0)
-            expect(verifier.transporter.sendMail.mock.calls.length).toBe(0)
-            expect(unlink.mock.calls.length).toBe(0)
-        })
+        await verifier.verify(EMAIL, {sendPush: false, sendEmail: false})
+        expect(CREDENTIALS.push.mock.calls.length).toBe(0)
+        expect(qr.image.mock.calls.length).toBe(0)
+        expect(createWriteStream.mock.calls.length).toBe(0)
+        expect(verifier.transporter.sendMail.mock.calls.length).toBe(0)
+        expect(unlink.mock.calls.length).toBe(0)
     })
 
-    it('should return an identity object describing the recipient', () => {
+    it('should return an identity object describing the recipient', async () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
-
-        return verifier.verify(EMAIL).then(result => {
-            expect(result).toEqual(expect.objectContaining({
-                address: ADDRESS,
-                attestation: ATTESTATION,
-                email: EMAIL,
-            }))
-        })
+        const result = await verifier.verify(EMAIL)
+        expect(result).toEqual(expect.objectContaining({
+            address: ADDRESS,
+            attestation: ATTESTATION,
+            email: EMAIL,
+        }))
     })
 })

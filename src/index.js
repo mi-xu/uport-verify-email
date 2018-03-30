@@ -96,7 +96,7 @@ class EmailVerifier {
      * @param {string} [callbackUrl=this.callbackUrl] - endpoint to call when user scans email verification QR
      * @return {string} selective disclosure request token
      */
-    receive (email = throwIfMissing`email`, callbackUrl = this.callbackUrl) {
+    receive(email = throwIfMissing`email`, callbackUrl = this.callbackUrl) {
         if (!Isemail.validate(email)) throw new Error('invalid email format')
 
         // add email as callbackUrl param
@@ -143,6 +143,66 @@ class EmailVerifier {
         })
     }
 
+    createImage(requestUri) {
+        const filename = `QR-${randomBytes(8).toString('hex')}.png` 
+        const requestQrData = qr.image(requestUri, {type: 'png'})
+        return new Promise((resolve, reject) => {
+            requestQrData.pipe(createWriteStream(filename))
+            .on('finish', () => {
+                return resolve(filename)
+            })
+            // TODO(mike.xu): reject stream errors
+        })
+    }
+
+    sendEmail(email, filename, type) {
+        const emailOptions = {
+            from: this.from,
+            to: email,
+            subject: this[`${type}Subject`],
+            html: this[`${type}Template`](`cid:${filename}`),
+            attachments: [{
+                filename,
+                path: `./${filename}`,
+                cid: filename,
+            }],
+        }
+        return new Promise((resolve, reject) => {
+            this.transporter.sendMail(emailOptions, (error, info) => {
+                if (error) return reject(error)
+                return resolve(info)
+            })
+        })
+    }
+
+    deleteImage(filename) {
+        return new Promise((resolve, reject) => {
+            unlink(filename, error => {
+                if (error) return reject(error)
+                return resolve(true)
+            })
+        })
+    }
+
+    async receivePromise(
+        email = throwIfMissing`email`,
+        callbackUrl = this.callbackUrl
+    ) {
+        if (!Isemail.validate(email)) throw new Error('invalid email format')
+        const callbackUrlWithEmail = `${callbackUrl}?email=${email}`
+        // NOTE(mike.xu): credentials.createRequest takes param called `callbackUrl`, but sets it to `callback` attribute in token
+        const requestToken = await this.credentials.createRequest({
+            callbackUrl: callbackUrlWithEmail,
+            notifications: true,
+            ...this.customRequestParams,
+        })
+        const requestUri = `me.uport:me?requestToken=${requestToken}`
+        const filename = await createImage(requestUri)
+        await sendEmail(email, filename, 'confirm')
+        await deleteImage(filename)
+        return filename
+    }
+
     /**
      * Signs a claim attesting ownership of the email address to the uPort identity that
      * sent the access token.  Sends the attestation via push notification and email.
@@ -152,7 +212,7 @@ class EmailVerifier {
      * @param {boolean} settings.sendPush - flag to send email attestation via push notification
      * @param {boolean} settings.sendEmail - flag to send email attestation via email containing QR code
      */
-    verify (accessToken, settings = {sendPush: true, sendEmail: true}) {
+    verify(accessToken, settings = {sendPush: true, sendEmail: true}) {
         const sendPush = !(settings.sendPush === false)
         const sendEmail = !(settings.sendEmail === false)
 
@@ -224,6 +284,40 @@ class EmailVerifier {
                 accessToken: accessToken
             }
         })
+    }
+
+    async verifyPromise(
+        accessToken,
+        settings = {sendPush: true, sendEmail: true}
+    ) {
+        const sendPush = !(settings.sendPush === false)
+        const sendEmail = !(settings.sendEmail === false)
+        const requestToken = jwtDecode.default(accessToken).req
+        const callbackUrlWithEmail = jwtDecode.default(requestToken).callback
+        const email = url.parse(callbackUrlWithEmail, true).query.email
+        const identity = await this.credentials.receive(accessToken)
+        const attestation = await this.credentials.attest({
+            sub: identity.address,
+            claim: {email}
+        })
+        const attestationUri = `me.uport:add?attestations=${attestation}`
+        if (sendPush) {
+            await this.credentials.push(
+                identity.pushToken,
+                {url: attestationUri}
+            )
+        }
+        if (sendEmail) {
+            const filename = await this.createImage(attestationUri)
+            await this.sendEmail(email, filename, 'receive')
+            await this.deleteImage(filename)
+        }
+        return {
+            ...identity,
+            attestation,
+            email,
+            accessToken
+        }
     }
 }
 

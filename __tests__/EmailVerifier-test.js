@@ -54,8 +54,12 @@ const CUSTOM_REQUEST_PARAMS = {
     requested: ['avatar', 'name'],
     verified: ['custom-attestation-title'],
 }
-// TODO(mike.xu): set this to be an actual example JWT
-const REQUEST_TOKEN = 'JWT'
+const ADDRESS = 'mnid'
+// TODO(mike.xu): set tokens to be an actual example JWT?
+const REQUEST_TOKEN = 'request JWT'
+const ACCESS_TOKEN = 'access JWT'
+const PUSH_TOKEN = 'push JWT'
+const ATTESTATION = 'attestation JWT'
 // eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpc3MiOiIyb3JEdVBWNDd0R0o5WHE0UnlHb1l2
 // b1E3N1pyVTdGREVIVCIsImlhdCI6MTUyMjM2NDgxMiwicGVybWlzc2lvbnMiOlsibm90aWZpY2F0aW9
 // ucyJdLCJjYWxsYmFjayI6Imh0dHA6Ly8xOTIuMTY4LjEuNDozMDAwL2FwaS9kaWdpdGFsVXNlcnMvdm
@@ -85,14 +89,6 @@ const VALID_PARAMS = {
     ...MAIL_AUTH_PARAMS,
     service: SERVICE,
 }
-// TODO(mike.xu): set this to be an actual example JWT
-const ACCESS_TOKEN = 'JWT'
-// TODO(mike.xu): set this to be an actual example mnid
-const ADDRESS = 'mnid'
-// TODO(mike.xu): set this to be an actual example JWT
-const PUSH_TOKEN = 'JWT'
-// TODO(mike.xu): set this to be an actual example JWT
-const ATTESTATION = 'JWT'
 
 describe('constructor', () => {
     it('should throw an error when initialized without uPort credentials', () => {
@@ -190,7 +186,7 @@ describe('receive', () => {
         expect(() => verifier.receive(INVALID_EMAIL)).toThrow(/invalid email format/)
     })
 
-    it('should call credentials.createRequest with notifications and callback containing the email', () => {
+    it('should create a credential request with notifications and callback containing the email', () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
         const createRequestCalls = verifier.credentials.createRequest.mock.calls
 
@@ -204,7 +200,7 @@ describe('receive', () => {
         })
     })
 
-    it('should call credentials.createRequest with custom request params', () => {
+    it('should create a credential request with custom request params', () => {
         const verifier = new EmailVerifier({
             ...VALID_PARAMS,
             customRequestParams: CUSTOM_REQUEST_PARAMS,
@@ -222,7 +218,7 @@ describe('receive', () => {
         })
     })
 
-    it('should call qr.image with a uPort url containing the request token', () => {
+    it('should create a QR for a uPort url containing the request token', () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
 
         expect.assertions(2)
@@ -256,7 +252,7 @@ describe('receive', () => {
         })
     })
 
-    it('should delete the request QR png after sending the email', () => {
+    it('should delete the request QR image after sending the email', () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
 
         expect.assertions(3)
@@ -301,7 +297,7 @@ describe('verify', () => {
         unlink.mockClear()
     })
 
-    it('should call credentials.attest to sign an attestation claiming the email', () => {
+    it('should create and sign an attestation claiming the email', () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
 
         expect.assertions(2)
@@ -338,7 +334,7 @@ describe('verify', () => {
         })
     })
 
-    it('should call qr.image with a uPort url containing the attestation', () => {
+    it('should create a QR for a uPort url containing the attestation', () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
 
         expect.assertions(2)
@@ -372,7 +368,7 @@ describe('verify', () => {
         })
     })
 
-    it('should delete the request QR png after sending the email', () => {
+    it('should delete the attestation QR image after sending the email', () => {
         const verifier = new EmailVerifier(VALID_PARAMS)
 
         expect.assertions(3)
@@ -421,6 +417,4 @@ describe('verify', () => {
             }))
         })
     })
-
-    // TODO(mike.xu): figure out how to test for optional requested params
 })

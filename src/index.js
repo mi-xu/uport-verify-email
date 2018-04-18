@@ -41,6 +41,7 @@ class EmailVerifier {
      * @param   {template}      [settings.confirmTemplate] - confirmation email template
      * @param   {template}      [settings.receiveTemplate] - receive attestation email template
      * @param   {Object}        [settings.customRequestParams] - custom params for credentials.createRequest()
+     * @param   {string}        [settings.qrFolder] - folder for temporary qr image
      */
     constructor ({
         credentials = throwIfMissing`credentials`,
@@ -57,6 +58,7 @@ class EmailVerifier {
         confirmTemplate = DEFAULT_TEMPLATE,
         receiveTemplate = DEFAULT_TEMPLATE,
         customRequestParams = {},
+        qrFolder = './'
     } = {}) {
         this.credentials = credentials
         this.callbackUrl = callbackUrl
@@ -84,6 +86,7 @@ class EmailVerifier {
         this.confirmTemplate = confirmTemplate
         this.receiveTemplate = receiveTemplate
         this.customRequestParams = customRequestParams
+        this.qrFolder = qrFolder
     }
 
     /**
@@ -163,7 +166,7 @@ class EmailVerifier {
 
     _createImage(requestUri) {
         // NOTE(mike.xu): how to calculate the minimum random bytes needed as a function of max images written on fs at once?
-        const filename = `QR-${randomBytes(8).toString('hex')}.png` 
+        const filename = this.qrFolder + `QR-${randomBytes(8).toString('hex')}.png` 
         const requestQrData = qr.image(requestUri, {type: 'png'})
         return new Promise((resolve, reject) => {
             requestQrData.pipe(createWriteStream(filename))
@@ -181,7 +184,7 @@ class EmailVerifier {
             html: this[`${type}Template`](`cid:${filename}`),
             attachments: [{
                 filename,
-                path: `./${filename}`,
+                path: `${filename}`,
                 cid: filename,
             }],
         }

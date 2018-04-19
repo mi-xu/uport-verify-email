@@ -9,7 +9,7 @@ import * as jwtDecode from 'jwt-decode'
 
 const DEFAULT_CONFIRM_SUBJECT = 'uPort Email Confirmation'
 const DEFAULT_RECEIVE_SUBJECT = 'uPort Email Attestation'
-const DEFAULT_TEMPLATE = qr => `<div><img src="${qr}"></img><a href="${qr}">If on mobile, click to open uPort</a></div>`
+const DEFAULT_TEMPLATE = (qr, uri) => `<div><img src="${qr}"></img><a href="${uri}">If on mobile, click to open uPort</a></div>`
 
 const throwIfMissing = x => {
     throw new Error(`Missing parameter '${x}'`)
@@ -106,7 +106,8 @@ class EmailVerifier {
             ...this.customRequestParams,
         })
         const requestUri = `me.uport:me?requestToken=${requestToken}`
-        return await this._sendEmailWithQR(email, requestUri, 'confirm')
+        const deepLink = `https://id.uport.me/me?requestToken=${requestToken}`
+        return await this._sendEmailWithQR(email, requestUri, deepLink, 'confirm')
     }
 
     /**
@@ -148,7 +149,8 @@ class EmailVerifier {
         }
         if (!(settings.sendEmail === false)) {
             try {
-                await this._sendEmailWithQR(email, attestationUri, 'receive')
+                const deepLink = `https://id.uport.me/add?attestations=${attestation}`
+                await this._sendEmailWithQR(email, attestationUri, deepLink, 'receive')
             } catch (error) {
                 console.error('Error sending attestation email:', error)
             }
@@ -173,12 +175,12 @@ class EmailVerifier {
         })
     }
 
-    _sendEmail(email, filename, type) {
+    _sendEmail(email, filename, type, uri) {
         const emailOptions = {
             from: this.from,
             to: email,
             subject: this[`${type}Subject`],
-            html: this[`${type}Template`](`cid:${filename}`),
+            html: this[`${type}Template`](`cid:${filename}`, uri),
             attachments: [{
                 filename,
                 path: `./${filename}`,
@@ -202,9 +204,9 @@ class EmailVerifier {
         })
     }
 
-    async _sendEmailWithQR(email, qrData, messageType) {
+    async _sendEmailWithQR(email, qrData, deepLink, messageType) {
         const filename = await this._createImage(qrData)
-        const emailInfo = await this._sendEmail(email, filename, messageType)
+        const emailInfo = await this._sendEmail(email, filename, messageType, deepLink)
         await this._deleteImage(filename)
         return emailInfo
     }

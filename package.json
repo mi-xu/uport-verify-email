@@ -1,6 +1,6 @@
 {
   "name": "uport-verify-email",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "server side library for allowing users to verify email address and receive an attestation claiming common ownership with a uport identity",
   "main": "lib/index.js",
   "scripts": {

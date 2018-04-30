@@ -144,6 +144,7 @@ class EmailVerifier {
             try {
                 await this.credentials.push(
                     identity.pushToken,
+                    identity.publicEncKey,
                     {url: attestationUri}
                 )
             } catch (error) {

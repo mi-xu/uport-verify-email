@@ -59,6 +59,7 @@ const ADDRESS = 'mnid'
 const REQUEST_TOKEN = 'request JWT'
 const ACCESS_TOKEN = 'access JWT'
 const PUSH_TOKEN = 'push JWT'
+const PUBLIC_ENC_KEY = 'public encryption key'
 const ATTESTATION = 'attestation JWT'
 // eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpc3MiOiIyb3JEdVBWNDd0R0o5WHE0UnlHb1l2
 // b1E3N1pyVTdGREVIVCIsImlhdCI6MTUyMjM2NDgxMiwicGVybWlzc2lvbnMiOlsibm90aWZpY2F0aW9
@@ -253,6 +254,7 @@ describe('verify', () => {
             resolve({
                 address: ADDRESS,
                 pushToken: PUSH_TOKEN,
+                publicEncKey: PUBLIC_ENC_KEY,
             })
         )))
         CREDENTIALS.attest.mockReturnValue(new Promise((resolve, reject) => (
@@ -293,7 +295,8 @@ describe('verify', () => {
         await verifier.verify(ACCESS_TOKEN)
         expect(pushCalls.length).toBe(1)
         expect(pushCalls[0][0]).toBe(PUSH_TOKEN)
-        expect(pushCalls[0][1]).toEqual(expect.objectContaining({
+        expect(pushCalls[0][1]).toBe(PUBLIC_ENC_KEY)
+        expect(pushCalls[0][2]).toEqual(expect.objectContaining({
             url: expect.stringContaining(ATTESTATION)
         }))
     })
